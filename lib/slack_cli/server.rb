@@ -17,7 +17,7 @@ module SlackCLI
     end
 
     def index(env)
-      render_view(src: 'views/index.erb', binding: binding)
+      render_view(src: 'index.erb', binding: binding)
     end
 
     def callback(env)
@@ -41,13 +41,14 @@ module SlackCLI
       request = Rack::Request.new(env)
       FileUtils.mkdir_p(config_path)
       File.open(authorization_path, 'w'){|f| f << request['json']}
-      render_view(src: 'views/save_token.erb', binding: binding).tap do
+      render_view(src: 'save_token.erb', binding: binding).tap do
         webbrick.shutdown if webbrick
       end
     end
 
     def render_view(src:, binding:, status: 200)
-      erb = ERB.new(File.read(src))
+      full_src_path = File.expand_path(File.join(__dir__, '..', '..', 'views', src))
+      erb = ERB.new(File.read(full_src_path))
       erb.filename = src
       erb.result(binding)
       [status, {'Content Type' => 'text/html'}, [erb.result(binding)]]
