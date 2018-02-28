@@ -2,5 +2,19 @@
 
 require 'bundler/setup'
 require 'slack_cli'
+require 'thor'
 
-puts 'here!'
+class CLI < Thor
+  desc 'authorize', 'Authorize the CLI and get an access_token'
+  def authorize
+    SlackCLI.authorize
+  end
+
+  desc 'post TEXT', 'Post message to channel'
+  method_option :channel, required: true, aliases: '-c', desc: 'Channel to post the message'
+  def post(text)
+    SlackCLI.post(channel: options[:channel], text: text)
+  end
+end
+
+CLI.start

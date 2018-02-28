@@ -1,6 +1,25 @@
 module SlackCLI
   # Main Rack App for Callbacks
   class Server
+
+    attr_accessor :webbrick
+
+    def call(env)
+      if env['REQUEST_PATH'] == '/callback/'
+        callback(env)
+      elsif env['REQUEST_PATH'] == '/token/'
+        save_token(env)
+      elsif env['REQUEST_PATH'] == '/'
+        index(env)
+      else
+        [404, {}, ['File not found']]
+      end
+    end
+
+    def index(env)
+      render_view(src: 'views/index.erb', binding: binding)
+    end
+
     def callback(env)
       request = Rack::Request.new(env)
       slack_resp = fetch_token(code: request.params['code'])
@@ -20,10 +39,11 @@ module SlackCLI
 
     def save_token(env)
       request = Rack::Request.new(env)
-      json = JSON.parse(request['json'])
       FileUtils.mkdir_p(config_path)
-      File.open(access_token_path, 'w'){|f| f << json['access_token']}
-      render_view(src: 'views/save_token.erb', binding: binding)
+      File.open(authorization_path, 'w'){|f| f << request['json']}
+      render_view(src: 'views/save_token.erb', binding: binding).tap do
+        webbrick.shutdown if webbrick
+      end
     end
 
     def render_view(src:, binding:, status: 200)
@@ -33,22 +53,12 @@ module SlackCLI
       [status, {'Content Type' => 'text/html'}, [erb.result(binding)]]
     end
 
-    def access_token_path
-      File.join(config_path, 'access_token')
+    def authorization_path
+      File.join(config_path, 'authorization.json')
     end
 
     def config_path
       File.expand_path(File.join('~', '.config', 'slack_cli'))
-    end
-
-    def call(env)
-      if env['REQUEST_PATH'] == '/callback/'
-        callback(env)
-      elsif env['REQUEST_PATH'] == '/token/'
-        save_token(env)
-      else
-        [404, {}, ['File not found']]
-      end
     end
 
     def authorize_url
