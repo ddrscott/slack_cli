@@ -1,4 +1,6 @@
+#!/usr/bin/env ruby
+
 require 'bundler/setup'
 require 'slack_cli'
 
-run SlackCLI::Server.new
+puts 'here!'

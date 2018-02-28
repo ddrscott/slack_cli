@@ -1,5 +1,6 @@
 source 'https://rubygems.org'
 
-gem 'dotenv', '~> 2.2', require: 'dotenv/load'
-gem 'puma', '~> 3.11'
-gem 'rack', '~> 2.0'
+git_source(:github) {|repo_name| "https://github.com/#{repo_name}" }
+
+# Specify your gem's dependencies in slack_marvin.gemspec
+gemspec
