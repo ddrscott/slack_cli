@@ -28,4 +28,6 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'puma', '~> 3.11'
   spec.add_dependency 'rack', '~> 2.0'
   spec.add_dependency 'thor', '~> 0.20'
+  spec.add_dependency 'eventmachine', '~> 1.2'
+  spec.add_dependency 'websocket-eventmachine-client', '~> 1.2'
 end

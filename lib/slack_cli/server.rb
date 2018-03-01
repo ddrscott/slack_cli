@@ -80,9 +80,5 @@ module SlackCLI
     def client_secret
       ENV['SLACK_SECRET'] || raise('SLACK_SECRET not found in ENV!')
     end
-
-    def scope
-      ENV['SLACK_SCOPE'] || raise('SLACK_SCOPE not found in ENV!')
-    end
   end
 end

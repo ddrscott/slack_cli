@@ -23,13 +23,29 @@ class CLI < Thor
   method_option :channel, required: true, aliases: '-c', desc: 'Channel to post the message'
   def post(*text)
     handle_class_options
-    SlackCLI.clear_cache unless options[:cache]
     SlackCLI.post(channel: options[:channel], text: text.join(' '))
+  end
+
+  desc 'rtm', 'Real Time Message Connect'
+  method_option :type, default: ['message'], type: 'array', desc: 'List of message types to retrieve'
+  def rtm
+    handle_class_options
+    types = Set.new(options[:type])
+    
+    $stderr.puts({types: types.to_a}.to_json)
+    EM.run {
+      SlackCLI.rtm_connect do |msg|
+        if types.include?(msg['type'])
+          puts msg.to_json
+        end
+      end
+    }
   end
 
   private
 
   def handle_class_options
+    SlackCLI.clear_cache unless options[:cache]
     $DEBUG = options[:debug]
   end
 end

@@ -4,6 +4,8 @@ require 'dotenv/load' # must come first
 require 'cgi'
 require 'digest/md5'
 require 'erb'
+require 'eventmachine'
+require 'websocket/eventmachine/client'
 require 'fileutils'
 require 'json'
 require 'logger'
@@ -48,7 +50,7 @@ module SlackCLI
   end
 
   def authorize
-    puts "Go to \e[1;32mhttp://localhost:65187/\e[0m to authenticate Slack CLI."
+    $stderr.puts "Go to \e[1;32mhttp://localhost:65187/\e[0m to authenticate Slack CLI."
     t = Thread.new do
       Rack::Handler::WEBrick.run(cli_app, webrick_options) do |server|
         cli_app.webbrick = server
@@ -56,10 +58,10 @@ module SlackCLI
     end
     t.join
     if File.file?(cli_app.authorization_path)
-      puts "\e[32mSuccessfully authenticated.\e[0m"
+      $stderr.puts "\e[32mSuccessfully authenticated.\e[0m"
     else
-      puts 'There was a problem authorizing the token!'
-      puts log_string_io.read
+      $stderr.puts 'There was a problem authorizing the token!'
+      $stderr.puts log_string_io.read
     end
   end
 
@@ -87,7 +89,7 @@ module SlackCLI
 
   def slack_get(path:, refresh: true)
     url = "https://slack.com/api/#{path}"
-    cache_key = Digest::MD5.base64digest(url).gsub('=', '')
+    cache_key = Digest::MD5.hexdigest(url).gsub('=', '')
     full_cache_path = File.join(cache_path, cache_key)
     save = false
     data = if refresh == true || !File.file?(full_cache_path)
@@ -103,21 +105,18 @@ module SlackCLI
 
     json = JSON.parse(data)
     if (error = json['error'])
-      raise Error, "[#{error['code']}] #{error['text']}"
+      raise Error, json.inspect
     end
     File.open(full_cache_path, 'w'){|f| f << data} if save
     json
   end
 
-  # http.use_ssl = true
-  # http.verify_mode = OpenSSL::SSL::VERIFY_PEER
-  # http.set_debug_output($stdout) if $DEBUG
   def slack_post(path:, json:)
     uri = URI.parse("https://slack.com/api/#{path}")
     http = Net::HTTP.new(uri.host, uri.port)
     http.use_ssl = true
     http.verify_mode = OpenSSL::SSL::VERIFY_PEER
-    http.set_debug_output($stdout) if $DEBUG
+    http.set_debug_output($stderr) if $DEBUG
     header = {
       'Authorization' => "Bearer #{access_token}",
       'Content-Type' => 'application/json'
@@ -153,10 +152,33 @@ module SlackCLI
     if place
       slack_post(
         path: 'chat.postMessage',
-        json: { channel: place['id'], text: text }
+        json: { channel: place['id'], text: text, as_user: true}
       )
     else
       raise "No channel or user found for `#{channel}`"
+    end
+  end
+
+  def rtm_connect(**params, &block)
+    resp = slack_get(path: 'rtm.connect', refresh: true)
+    $stderr.puts resp.to_json
+    ws = WebSocket::EventMachine::Client.connect(uri: resp['url'])
+    ws.onopen do
+      $stderr.puts({status: 'connected'}.to_json)
+      # ws.send(connect_payload.to_json)
+    end
+
+    ws.onmessage do |msg, type|
+      if block
+        block.call(JSON.parse(msg))
+      else
+        puts msg
+      end
+    end
+
+    ws.onclose do |code, reason|
+      $stderr.puts({status: 'disconnected', code: code, reason: reason}.to_json)
+      rtm_connect
     end
   end
 end
