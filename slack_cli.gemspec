@@ -10,7 +10,7 @@ Gem::Specification.new do |spec|
   spec.email         = ['ddrscott@gmail.com']
 
   spec.summary       = 'Slack CLI'
-  spec.homepage      = "https://github.com/ddrscott/slack_cli"
+  spec.homepage      = 'https://github.com/ddrscott/slack_cli'
   spec.license       = 'MIT'
 
   spec.files         = `git ls-files -z`.split("\x0").reject do |f|

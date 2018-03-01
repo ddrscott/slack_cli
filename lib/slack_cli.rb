@@ -8,6 +8,7 @@ require 'fileutils'
 require 'json'
 require 'logger'
 require 'net/http'
+require 'openssl'
 require 'open-uri'
 require 'rack'
 require 'rack/handler/webrick'
@@ -17,6 +18,9 @@ require 'slack_cli/server'
 
 # Main module
 module SlackCLI
+
+  class Error < StandardError; end
+
   module_function
 
   def string_logger
@@ -25,6 +29,10 @@ module SlackCLI
 
   def log_string_io
     @log_string_io ||= StringIO.new
+  end
+
+  def clear_cache
+    FileUtils.rm_rf cache_path
   end
 
   def webrick_options
@@ -51,7 +59,7 @@ module SlackCLI
       puts "\e[32mSuccessfully authenticated.\e[0m"
     else
       puts 'There was a problem authorizing the token!'
-      puts log_string_io.to_s
+      puts log_string_io.read
     end
   end
 
@@ -77,36 +85,47 @@ module SlackCLI
     end
   end
 
-  def slack_get(path:, refresh: false)
+  def slack_get(path:, refresh: true)
     url = "https://slack.com/api/#{path}"
-    cache_key = Digest::MD5.base64digest(url).gsub('=','')
+    cache_key = Digest::MD5.base64digest(url).gsub('=', '')
     full_cache_path = File.join(cache_path, cache_key)
+    save = false
     data = if refresh == true || !File.file?(full_cache_path)
+      save = true
       open(
         url,
         'Authorization' => "Bearer #{access_token}",
         'Content-type' => 'application/json'
-      ).read.tap do |t|
-        File.open(full_cache_path, 'w'){|f| f << t}
-      end
+      ).read
     else
       File.read(full_cache_path)
     end
-    JSON.parse(data)
+
+    json = JSON.parse(data)
+    if (error = json['error'])
+      raise Error, "[#{error['code']}] #{error['text']}"
+    end
+    File.open(full_cache_path, 'w'){|f| f << data} if save
+    json
   end
 
+  # http.use_ssl = true
+  # http.verify_mode = OpenSSL::SSL::VERIFY_PEER
+  # http.set_debug_output($stdout) if $DEBUG
   def slack_post(path:, json:)
     uri = URI.parse("https://slack.com/api/#{path}")
-    Net::HTTP.start(uri.host, uri.port, use_ssl: true) do |http|
-      header = {
-        'Authorization' => "Bearer #{access_token}",
-        'Content-Type' => 'application/json'
-      }
-      request = Net::HTTP::Post.new(uri, header)
-      request.body = json.to_json
-      resp = http.request(request)
-      JSON.parse(resp.body)
-    end
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = true
+    http.verify_mode = OpenSSL::SSL::VERIFY_PEER
+    http.set_debug_output($stdout) if $DEBUG
+    header = {
+      'Authorization' => "Bearer #{access_token}",
+      'Content-Type' => 'application/json'
+    }
+    request = Net::HTTP::Post.new(uri, header)
+    request.body = json.to_json
+    resp = http.request(request)
+    JSON.parse(resp.body)
   end
 
   def channels(refresh: false)

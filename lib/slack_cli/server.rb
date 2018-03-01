@@ -39,6 +39,13 @@ module SlackCLI
 
     def save_token(env)
       request = Rack::Request.new(env)
+      json = JSON.parse(request['json'])
+      if json['error']
+        $stderr.puts "ERROR #{json['error']}"
+        FileUtils.rm_rf(authorization_path)
+        webbrick.shutdown if webbrick
+        raise Error, json['error']
+      end
       FileUtils.mkdir_p(config_path)
       File.open(authorization_path, 'w'){|f| f << request['json']}
       render_view(src: 'save_token.erb', binding: binding).tap do
@@ -60,10 +67,6 @@ module SlackCLI
 
     def config_path
       File.expand_path(File.join('~', '.config', 'slack_cli'))
-    end
-
-    def authorize_url
-      "https://slack.com/oauth/authorize?client_id=#{client_id}&scope=#{scope}&then=#{CGI.escape(save_token_url)}"
     end
 
     def save_token_url(token:)

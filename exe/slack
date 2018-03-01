@@ -1,19 +1,36 @@
 #!/usr/bin/env ruby
 
+require 'rubygems' # ruby1.9 doesn't "require" it though
 require 'bundler/setup'
 require 'slack_cli'
 require 'thor'
 
+# Thor options parser
 class CLI < Thor
+  class_option :debug, type: :boolean, alias: '-d'
+  class_option :cache, type: :boolean, default: true, desc: 'Channels and Users are cached'
+
+  def self.exit_on_failure?
+    true
+  end
+
   desc 'authorize', 'Authorize the CLI and get an access_token'
   def authorize
     SlackCLI.authorize
   end
 
-  desc 'post TEXT', 'Post message to channel'
+  desc 'post', 'Post message to channel'
   method_option :channel, required: true, aliases: '-c', desc: 'Channel to post the message'
-  def post(text)
-    SlackCLI.post(channel: options[:channel], text: text)
+  def post(*text)
+    handle_class_options
+    SlackCLI.clear_cache unless options[:cache]
+    SlackCLI.post(channel: options[:channel], text: text.join(' '))
+  end
+
+  private
+
+  def handle_class_options
+    $DEBUG = options[:debug]
   end
 end
 

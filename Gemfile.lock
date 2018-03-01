@@ -45,5 +45,8 @@ DEPENDENCIES
   rspec (~> 3.0)
   slack_cli!
 
+RUBY VERSION
+   ruby 2.5.0p0
+
 BUNDLED WITH
-   1.15.4
+   1.16.1
