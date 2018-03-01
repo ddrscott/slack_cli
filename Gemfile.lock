@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    slack_cli (0.2.0)
+    slack_cli (0.3.0)
       dotenv (~> 2.2)
       puma (~> 3.11)
       rack (~> 2.0)
