@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    slack_cli (0.3.0)
+    slack_cli (0.3.1)
       dotenv (~> 2.2)
       puma (~> 3.11)
       rack (~> 2.0)
@@ -18,7 +18,7 @@ GEM
       coderay (~> 1.1.0)
       method_source (~> 0.9.0)
     puma (3.11.2)
-    rack (2.0.3)
+    rack (2.0.4)
     rake (10.5.0)
     rspec (3.7.0)
       rspec-core (~> 3.7.0)
