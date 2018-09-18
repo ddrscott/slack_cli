@@ -52,6 +52,13 @@ class CLI < Thor
     }
   end
 
+  desc 'live', 'Live interaction with channel'
+  method_option :channel, required: true, aliases: '-c', desc: 'Channel'
+  method_option :title, aliases: '-t', desc: 'Title for live message', default: ':8ball:'
+  def live
+    SlackCLI.live(channel: options[:channel], title: options[:title])
+  end
+
   private
 
   def handle_class_options

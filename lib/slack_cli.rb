@@ -119,7 +119,7 @@ module SlackCLI
     http.set_debug_output($stderr) if $DEBUG
     header = {
       'Authorization' => "Bearer #{access_token}",
-      'Content-Type' => 'application/json'
+      'Content-Type' => 'application/json; charset=utf-8'
     }
     request = Net::HTTP::Post.new(uri, header)
     request.body = json.to_json
@@ -148,23 +148,88 @@ module SlackCLI
   end
 
   def post(channel:, text:)
-    place = users_by_name[channel] || channels_by_name[channel]
-    if place
-      slack_post(
-        path: 'chat.postMessage',
-        json: { channel: place['id'], text: text, as_user: true}
-      )
-    else
-      raise "No channel or user found for `#{channel}`"
+    slack_post(
+      path: 'chat.postMessage',
+      json: { channel: channel_id(channel), text: text, as_user: true}
+    )
+  end
+
+  def live_working(channel:, delay: 0.2)
+    dst = channel_id(channel)
+    first = slack_post(
+      path: 'chat.postMessage',
+      json: { channel: dst, text: '[live chat]', as_user: true}
+    )
+    Thread.abort_on_exception
+    prev = ''
+    Thread.new do
+      sleep(delay)
+      while (line = Readline.line_buffer)
+      end
     end
+    while (buf = Readline.readline("#{channel}> ", true))
+      slack_post(
+        path: 'chat.update',
+        json: { channel: first['channel'], text: buf, ts: first['ts'], as_user: true }
+      )
+    end
+  end
+
+  def live(channel:, delay: 0.1, title: ':8ball:')
+    tty.puts("\e[32m[Quit with <CTRL-C>]\e[0m")
+    final_msg = '[session ended]'
+    dst = channel_id(channel)
+    attachment = {text: '', title: title}
+    payload = {
+      channel: dst,
+      text: '*[Live chat started by Slack CLI]*',
+      as_user: true,
+      parse: 'none',
+      attachments: [attachment]
+    }
+    # Send first message and update payload
+    first = slack_post(path: 'chat.postMessage', json: payload)
+    payload[:channel] = first['channel']
+    payload[:ts] = first['ts']
+
+    # setup thread to listen for changes
+    Thread.abort_on_exception
+    lines = ['']
+    Thread.new do
+      sleep(delay)
+      prev = ''
+      while (line = Readline.line_buffer)
+        next if prev == line
+        lines[-1] = line
+        prev = line
+        attachment[:text] = lines.join("\n")
+        slack_post(path: 'chat.update', json: payload)
+        sleep(delay)
+      end
+    end
+    while (line = Readline.readline("#{channel}> ", true))
+      lines << '.'
+      attachment[:text] = lines.join("\n")
+      slack_post(path: 'chat.update', json: payload)
+    end
+  rescue Interrupt
+    tty.puts(final_msg)
+  ensure
+    lines << final_msg
+    attachment[:text] = lines.join("\n")
+    slack_post(path: 'chat.update', json: payload)
+  end
+
+  def tty
+    @tty ||= File.open('/dev/tty', 'a')
   end
 
   def rtm_connect(**params, &block)
     resp = slack_get(path: 'rtm.connect', refresh: true)
-    $stderr.puts resp.to_json
+    tty.puts resp.to_json
     ws = WebSocket::EventMachine::Client.connect(uri: resp['url'])
     ws.onopen do
-      $stderr.puts({status: 'connected'}.to_json)
+      tty.puts({status: 'connected'}.to_json)
       # ws.send(connect_payload.to_json)
     end
 
@@ -177,8 +242,15 @@ module SlackCLI
     end
 
     ws.onclose do |code, reason|
-      $stderr.puts({status: 'disconnected', code: code, reason: reason}.to_json)
+      tty.puts({status: 'disconnected', code: code, reason: reason}.to_json)
       rtm_connect
     end
+  end
+
+  def channel_id(channel)
+    result = users_by_name[channel] || \
+      channels_by_name[channel] || \
+      raise("No channel or user found for `#{channel}`")
+    result['id']
   end
 end
