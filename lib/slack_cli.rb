@@ -17,6 +17,7 @@ require 'rack/handler/webrick'
 require 'rack/request'
 
 require 'slack_cli/server'
+require 'slack_cli/live'
 
 # Main module
 module SlackCLI
@@ -154,72 +155,6 @@ module SlackCLI
     )
   end
 
-  def live_working(channel:, delay: 0.2)
-    dst = channel_id(channel)
-    first = slack_post(
-      path: 'chat.postMessage',
-      json: { channel: dst, text: '[live chat]', as_user: true}
-    )
-    Thread.abort_on_exception
-    prev = ''
-    Thread.new do
-      sleep(delay)
-      while (line = Readline.line_buffer)
-      end
-    end
-    while (buf = Readline.readline("#{channel}> ", true))
-      slack_post(
-        path: 'chat.update',
-        json: { channel: first['channel'], text: buf, ts: first['ts'], as_user: true }
-      )
-    end
-  end
-
-  def live(channel:, delay: 0.1, title: ':8ball:')
-    tty.puts("\e[32m[Quit with <CTRL-C>]\e[0m")
-    final_msg = '[session ended]'
-    dst = channel_id(channel)
-    attachment = {text: '', title: title}
-    payload = {
-      channel: dst,
-      text: '*[Live chat started by Slack CLI]*',
-      as_user: true,
-      parse: 'none',
-      attachments: [attachment]
-    }
-    # Send first message and update payload
-    first = slack_post(path: 'chat.postMessage', json: payload)
-    payload[:channel] = first['channel']
-    payload[:ts] = first['ts']
-
-    # setup thread to listen for changes
-    Thread.abort_on_exception
-    lines = ['']
-    Thread.new do
-      sleep(delay)
-      prev = ''
-      while (line = Readline.line_buffer)
-        next if prev == line
-        lines[-1] = line
-        prev = line
-        attachment[:text] = lines.join("\n")
-        slack_post(path: 'chat.update', json: payload)
-        sleep(delay)
-      end
-    end
-    while (line = Readline.readline("#{channel}> ", true))
-      lines << '.'
-      attachment[:text] = lines.join("\n")
-      slack_post(path: 'chat.update', json: payload)
-    end
-  rescue Interrupt
-    tty.puts(final_msg)
-  ensure
-    lines << final_msg
-    attachment[:text] = lines.join("\n")
-    slack_post(path: 'chat.update', json: payload)
-  end
-
   def tty
     @tty ||= File.open('/dev/tty', 'a')
   end
@@ -248,9 +183,9 @@ module SlackCLI
   end
 
   def channel_id(channel)
-    result = users_by_name[channel] || \
-      channels_by_name[channel] || \
-      raise("No channel or user found for `#{channel}`")
+    result = users_by_name[channel] ||    \
+             channels_by_name[channel] || \
+             raise("No channel or user found for `#{channel}`")
     result['id']
   end
 end
