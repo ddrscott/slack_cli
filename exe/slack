@@ -16,7 +16,17 @@ class CLI < Thor
 
   desc 'authorize', 'Authorize the CLI and get an access_token'
   def authorize
-    SlackCLI.authorize
+    puts SlackCLI.authorize.to_json
+  end
+
+  desc 'channels', 'List all channels'
+  def channels
+    puts SlackCLI.channels.to_json
+  end
+
+  desc 'users', 'List all users'
+  def users
+    puts SlackCLI.users.to_json
   end
 
   desc 'post', 'Post message to channel'
@@ -31,7 +41,7 @@ class CLI < Thor
   def rtm
     handle_class_options
     types = Set.new(options[:type])
-    
+
     $stderr.puts({types: types.to_a}.to_json)
     EM.run {
       SlackCLI.rtm_connect do |msg|
