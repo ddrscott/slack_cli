@@ -52,6 +52,8 @@ module SlackCLI
     end
 
     def run
+      trap('SIGINT') { exit(130) }
+
       tty.puts("\e[32m[Quit with <CTRL-C>]\e[0m")
       first = slack_post(path: 'chat.postMessage', json: payload)
       @channel_id = first['channel']
@@ -66,11 +68,10 @@ module SlackCLI
         lines << ''
         slack_post(path: 'chat.update', json: payload)
       end
-    rescue Interrupt
-      tty.puts(final_msg)
     ensure
       lines << final_msg
       slack_post(path: 'chat.update', json: payload)
+      tty.puts(final_msg)
     end
   end
 end
